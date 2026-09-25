@@ -14,18 +14,26 @@ See [`CLAUDE.md`](CLAUDE.md) for the full design/instruction set.
 ## Quickstart
 
 ```bash
-cp .env.example .env                 # set REPOS=owner/repo,owner/repo
-export GH_TOKEN="$(gh auth token)"   # CLI-now auth; needs push access to the repos
-export REPOS="owner/repo"            # or edit .env
+cp .env.example .env
+# token + full repo list (owned first, then forks, newest push first):
+{
+  echo "GH_TOKEN=$(gh auth token)"
+  echo "COLLECT_DAYS=14"
+  echo "REPOS=$(gh repo list <owner> -L 2000 --json nameWithOwner,isFork,pushedAt --jq '
+    (map(select(.isFork|not))|sort_by(.pushedAt)|reverse)
+    + (map(select(.isFork))|sort_by(.pushedAt)|reverse) | map(.nameWithOwner)|join(","))"
+} >> .env
 docker compose up -d --build
 ```
 
-- Grafana: <http://localhost:3000> (admin / admin) → dashboard **GitHub Traffic Insights**.
-- The collector runs one pass immediately, then once every 24h.
-- Backfill the full 14-day window once: `docker compose exec collector python -m ghtraffic.cli --backfill`
+- Grafana: <http://localhost:3000> → dashboard **GitHub Traffic Insights**.
+  Login is disabled (anonymous Admin) for local use.
+- Both containers run **non-root** (uid 472) and share a SQLite named volume.
+- The collector runs one 14-day pass immediately, then once every 24h.
+- Force a fresh full pull: `docker compose exec collector python -m ghtraffic.cli --backfill`
 
-> Rootless Docker note: if `docker` can't find the daemon, use
-> `export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock`.
+> Rootless Docker note: if `docker` can't find the daemon, point it at the
+> rootless socket: `export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock`.
 
 ## Stack
 

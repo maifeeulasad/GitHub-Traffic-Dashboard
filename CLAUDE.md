@@ -119,12 +119,20 @@ Traffic endpoints require **push access** to the repo (owner token satisfies thi
 
 ## Docker / local dev
 
-- Everything runs via **`docker compose`** here: `postgres`, `grafana`, and the
-  `collector`. Prefer testing in-repo with compose over host installs.
+- Everything runs via **`docker compose`** here: `grafana` and the `collector`, sharing
+  a SQLite **named volume** (`dbdata`). Prefer testing in-repo with compose.
+- **Never run containers as root.** Both run as uid 472 so, under rootless Docker, they
+  share the volume at one uid and the SQLite WAL works without root. Use the active
+  `docker context` (Docker Desktop socket); don't hardcode a socket path.
 - Pass auth as `GH_TOKEN="$(gh auth token)"` in the compose env (never commit it; use a
   git-ignored `.env`). Document the one-liner in the README.
-- Keep the collector runnable one-shot (`collect --once`) for manual testing and on a
-  daily schedule for production.
+- Grafana login is **disabled** (anonymous Admin, no login form) for local use; re-enable
+  auth before exposing it beyond localhost.
+- Large repo sets (~1160): the client retries on rate-limit (403/429) and transient
+  DNS/network errors with backoff; `REPO_DELAY` adds politeness between repos. Order
+  repos owned-first then forks, newest push first.
+- Keep the collector runnable one-shot (`collect --once` / `--backfill`) for manual
+  testing and on a daily schedule for production.
 
 ## Working style in this repo
 
