@@ -10,6 +10,42 @@
   "templating": {
     "list": [
       {
+        "name": "visibility",
+        "label": "Visibility",
+        "type": "custom",
+        "query": "All,public,private",
+        "current": { "text": "All", "value": "All" },
+        "options": [
+          { "text": "All", "value": "All", "selected": true },
+          { "text": "public", "value": "public", "selected": false },
+          { "text": "private", "value": "private", "selected": false }
+        ]
+      },
+      {
+        "name": "fork",
+        "label": "Type",
+        "type": "custom",
+        "query": "All : All, Source : 0, Fork : 1",
+        "current": { "text": "All", "value": "All" },
+        "options": [
+          { "text": "All", "value": "All", "selected": true },
+          { "text": "Source", "value": "0", "selected": false },
+          { "text": "Fork", "value": "1", "selected": false }
+        ]
+      },
+      {
+        "name": "archived",
+        "label": "Archived",
+        "type": "custom",
+        "query": "All : All, Active : 0, Archived : 1",
+        "current": { "text": "Active", "value": "0" },
+        "options": [
+          { "text": "All", "value": "All", "selected": false },
+          { "text": "Active", "value": "0", "selected": true },
+          { "text": "Archived", "value": "1", "selected": false }
+        ]
+      },
+      {
         "name": "repository",
         "label": "Repository",
         "type": "query",
@@ -17,7 +53,7 @@
         "includeAll": true,
         "multi": true,
         "refresh": 2,
-        "query": "SELECT DISTINCT repository FROM traffic_daily ORDER BY repository",
+        "query": "SELECT repository FROM repos WHERE ('${visibility}'='All' OR visibility='${visibility}') AND ('${fork}'='All' OR is_fork='${fork}') AND ('${archived}'='All' OR is_archived='${archived}') ORDER BY repository",
         "sort": 1
       }
     ]
@@ -75,34 +111,50 @@
       "targets": [ { "refId": "A", "queryType": "time series", "rawQueryText": "SELECT strftime('%s', day) AS time, SUM(count) AS \"Clones\", SUM(uniques) AS \"Unique cloners\" FROM traffic_daily WHERE metric='clones' AND repository IN (${repository:sqlstring}) GROUP BY day ORDER BY day", "queryText": "SELECT strftime('%s', day) AS time, SUM(count) AS \"Clones\", SUM(uniques) AS \"Unique cloners\" FROM traffic_daily WHERE metric='clones' AND repository IN (${repository:sqlstring}) GROUP BY day ORDER BY day", "timeColumns": ["time"] } ]
     },
 
-    { "type": "row", "title": "Lead sources & content", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 } },
+    {
+      "type": "row", "title": "Detailed per-repository views (optional — expand to load)",
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "panels": [
+        {
+          "type": "timeseries", "title": "Views by repository (one line per repo)",
+          "datasource": { "type": "frser-sqlite-datasource", "uid": "ghtraffic-sqlite" },
+          "gridPos": { "h": 11, "w": 24, "x": 0, "y": 15 },
+          "fieldConfig": { "defaults": { "displayName": "${__field.labels.repository}", "custom": { "drawStyle": "line", "fillOpacity": 6, "lineWidth": 1, "showPoints": "never" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum", "max"], "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [ { "refId": "A", "queryType": "time series", "rawQueryText": "SELECT strftime('%s', day) AS time, repository, SUM(count) AS views FROM traffic_daily WHERE metric='views' AND repository IN (${repository:sqlstring}) GROUP BY day, repository ORDER BY day", "queryText": "SELECT strftime('%s', day) AS time, repository, SUM(count) AS views FROM traffic_daily WHERE metric='views' AND repository IN (${repository:sqlstring}) GROUP BY day, repository ORDER BY day", "timeColumns": ["time"] } ]
+        }
+      ]
+    },
+
+    { "type": "row", "title": "Lead sources & content", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 } },
     {
       "type": "table", "title": "Referring sites (lead channels)",
       "datasource": { "type": "frser-sqlite-datasource", "uid": "ghtraffic-sqlite" },
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 15 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 16 },
       "options": { "showHeader": true },
       "targets": [ { "refId": "A", "queryType": "table", "rawQueryText": "SELECT source AS \"Referring site\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique visitors\" FROM referrers WHERE repository IN (${repository:sqlstring}) AND day = (SELECT MAX(day) FROM referrers r2 WHERE r2.repository = referrers.repository) GROUP BY source ORDER BY \"Views\" DESC", "queryText": "SELECT source AS \"Referring site\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique visitors\" FROM referrers WHERE repository IN (${repository:sqlstring}) AND day = (SELECT MAX(day) FROM referrers r2 WHERE r2.repository = referrers.repository) GROUP BY source ORDER BY \"Views\" DESC", "timeColumns": [] } ]
     },
     {
       "type": "table", "title": "Popular content",
       "datasource": { "type": "frser-sqlite-datasource", "uid": "ghtraffic-sqlite" },
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 15 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 16 },
       "options": { "showHeader": true },
       "targets": [ { "refId": "A", "queryType": "table", "rawQueryText": "SELECT COALESCE(NULLIF(title,''), path) AS \"Content\", path AS \"Path\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique visitors\" FROM popular_paths WHERE repository IN (${repository:sqlstring}) AND day = (SELECT MAX(day) FROM popular_paths p2 WHERE p2.repository = popular_paths.repository) GROUP BY path ORDER BY \"Views\" DESC", "queryText": "SELECT COALESCE(NULLIF(title,''), path) AS \"Content\", path AS \"Path\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique visitors\" FROM popular_paths WHERE repository IN (${repository:sqlstring}) AND day = (SELECT MAX(day) FROM popular_paths p2 WHERE p2.repository = popular_paths.repository) GROUP BY path ORDER BY \"Views\" DESC", "timeColumns": [] } ]
     },
     {
       "type": "table", "title": "Per-repository summary",
       "datasource": { "type": "frser-sqlite-datasource", "uid": "ghtraffic-sqlite" },
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 15 },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 16 },
       "options": { "showHeader": true },
       "targets": [ { "refId": "A", "queryType": "table", "rawQueryText": "SELECT repository AS \"Repository\", SUM(CASE WHEN metric='views' THEN count ELSE 0 END) AS \"Views\", SUM(CASE WHEN metric='views' THEN uniques ELSE 0 END) AS \"Unique visitors\", SUM(CASE WHEN metric='clones' THEN count ELSE 0 END) AS \"Clones\" FROM traffic_daily WHERE repository IN (${repository:sqlstring}) GROUP BY repository ORDER BY \"Views\" DESC", "queryText": "SELECT repository AS \"Repository\", SUM(CASE WHEN metric='views' THEN count ELSE 0 END) AS \"Views\", SUM(CASE WHEN metric='views' THEN uniques ELSE 0 END) AS \"Unique visitors\", SUM(CASE WHEN metric='clones' THEN count ELSE 0 END) AS \"Clones\" FROM traffic_daily WHERE repository IN (${repository:sqlstring}) GROUP BY repository ORDER BY \"Views\" DESC", "timeColumns": [] } ]
     },
 
-    { "type": "row", "title": "Momentum (week over week)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 } },
+    { "type": "row", "title": "Momentum (week over week)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 } },
     {
       "type": "table", "title": "Top-growing repositories (views, last 7d vs prior 7d)",
       "datasource": { "type": "frser-sqlite-datasource", "uid": "ghtraffic-sqlite" },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 25 },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 26 },
       "options": { "showHeader": true },
       "fieldConfig": { "defaults": {}, "overrides": [ { "matcher": { "id": "byName", "options": "Change" }, "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-background" } }, { "id": "color", "value": { "mode": "continuous-RdYlGr" } } ] } ] },
       "targets": [ { "refId": "A", "queryType": "table", "rawQueryText": "SELECT repository AS \"Repository\", SUM(CASE WHEN day >= date('now','-7 day') THEN count ELSE 0 END) AS \"Last 7d\", SUM(CASE WHEN day < date('now','-7 day') AND day >= date('now','-14 day') THEN count ELSE 0 END) AS \"Prior 7d\", SUM(CASE WHEN day >= date('now','-7 day') THEN count ELSE 0 END) - SUM(CASE WHEN day < date('now','-7 day') AND day >= date('now','-14 day') THEN count ELSE 0 END) AS \"Change\" FROM traffic_daily WHERE metric='views' AND repository IN (${repository:sqlstring}) GROUP BY repository ORDER BY \"Change\" DESC", "queryText": "SELECT repository AS \"Repository\", SUM(CASE WHEN day >= date('now','-7 day') THEN count ELSE 0 END) AS \"Last 7d\", SUM(CASE WHEN day < date('now','-7 day') AND day >= date('now','-14 day') THEN count ELSE 0 END) AS \"Prior 7d\", SUM(CASE WHEN day >= date('now','-7 day') THEN count ELSE 0 END) - SUM(CASE WHEN day < date('now','-7 day') AND day >= date('now','-14 day') THEN count ELSE 0 END) AS \"Change\" FROM traffic_daily WHERE metric='views' AND repository IN (${repository:sqlstring}) GROUP BY repository ORDER BY \"Change\" DESC", "timeColumns": [] } ]
