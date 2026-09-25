@@ -1,0 +1,2 @@
+# No third-party dependencies — the collector uses only the Python standard
+# library (urllib for HTTP, sqlite3 for storage). Kept for future additions.
