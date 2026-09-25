@@ -1,0 +1,38 @@
+# Two containers, one shared SQLite file. No DB server.
+#
+# Auth: export a token before `up` so the collector can reach the API:
+#   export GH_TOKEN="$(gh auth token)"    # host has gh logged in
+#   docker compose up -d --build
+services:
+  collector:
+    build: ./collector
+    environment:
+      GH_TOKEN: ${GH_TOKEN:-}
+      REPOS: ${REPOS:-maifeeulasad/lilac}
+      COLLECT_DAYS: ${COLLECT_DAYS:-2}
+      DB_PATH: /data/traffic.db
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    # daemon: one pass now, then every 24h (see Dockerfile CMD)
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: frser-sqlite-datasource
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: frser-sqlite-datasource
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-storage:/var/lib/grafana
+    depends_on:
+      - collector
+    restart: unless-stopped
+
+volumes:
+  grafana-storage:

@@ -1,0 +1,11 @@
+apiVersion: 1
+
+datasources:
+  - name: GitHubTraffic
+    type: frser-sqlite-datasource
+    uid: ghtraffic-sqlite
+    access: proxy
+    isDefault: true
+    jsonData:
+      path: /data/traffic.db
+    editable: true
