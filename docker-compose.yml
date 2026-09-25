@@ -18,6 +18,9 @@ services:
 
   grafana:
     image: grafana/grafana:11.2.0
+    # Run as root so, under rootless Docker, Grafana shares the collector's
+    # host UID and can open the WAL SQLite file (create -wal/-shm sidecars).
+    user: "0"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
@@ -26,7 +29,9 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./data:/data:ro
+      # read-write: the SQLite (WAL) plugin needs to touch -wal/-shm sidecars.
+      # Grafana only ever issues SELECTs, so the data stays collector-owned.
+      - ./data:/data
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-storage:/var/lib/grafana
