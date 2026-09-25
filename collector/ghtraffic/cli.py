@@ -25,9 +25,15 @@ def _run_once(cfg: Config, collect_days: int) -> None:
     with Storage(cfg.db_path) as storage:
         storage.init_schema()
         client = GitHubClient(default_provider())
-        Collector(
+        collector = Collector(
             client, storage, collect_days=collect_days, repo_delay=cfg.repo_delay
-        ).collect_all(cfg.repositories)
+        )
+        # refresh cheap dimension metadata (fork/visibility/archived) each pass
+        try:
+            collector.sync_repos()
+        except Exception as exc:  # noqa: BLE001 - metadata is best-effort
+            log.warning("repo metadata sync failed (continuing): %s", exc)
+        collector.collect_all(cfg.repositories)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,6 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--once", action="store_true", help="run a single pass and exit")
     mode.add_argument("--backfill", action="store_true", help="pull full 14-day window once")
     mode.add_argument("--daemon", action="store_true", help="loop forever")
+    mode.add_argument("--sync-repos", action="store_true", help="load repo metadata only, then exit")
     parser.add_argument("--interval", type=float, default=24.0, help="daemon interval, hours")
     args = parser.parse_args(argv)
 
@@ -45,6 +52,13 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     cfg = Config.from_env()
+
+    if args.sync_repos:
+        with Storage(cfg.db_path) as storage:
+            storage.init_schema()
+            Collector(GitHubClient(default_provider()), storage).sync_repos()
+        return 0
+
     if not cfg.repositories:
         log.error("no repositories configured (set REPOS=owner/repo,owner/repo)")
         return 2

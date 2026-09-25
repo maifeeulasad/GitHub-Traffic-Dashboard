@@ -28,6 +28,17 @@ class Referrer:
 
 
 @dataclass(frozen=True)
+class RepoMeta:
+    """Repository dimension attributes (from the repo list, not the traffic API)."""
+
+    repository: str
+    is_fork: bool
+    visibility: str   # 'public' | 'private'
+    is_archived: bool
+    updated_at: str
+
+
+@dataclass(frozen=True)
 class PopularPath:
     """A popular content path snapshot for a repo on a collection day."""
 

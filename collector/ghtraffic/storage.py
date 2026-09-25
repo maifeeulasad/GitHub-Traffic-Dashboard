@@ -10,7 +10,7 @@ import sqlite3
 from pathlib import Path
 from typing import Iterable
 
-from .models import PopularPath, Referrer, TrafficPoint
+from .models import PopularPath, Referrer, RepoMeta, TrafficPoint
 
 _SCHEMA = Path(__file__).resolve().parent.parent / "schema.sql"
 
@@ -21,9 +21,12 @@ class Storage:
     def __init__(self, db_path: str) -> None:
         self._db_path = db_path
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(db_path)
+        self._conn = sqlite3.connect(db_path, timeout=60)
         self._conn.execute("PRAGMA journal_mode=WAL;")
         self._conn.execute("PRAGMA foreign_keys=ON;")
+        # wait (don't error) when another writer holds the lock — lets a one-off
+        # metadata sync run alongside the collector safely.
+        self._conn.execute("PRAGMA busy_timeout=30000;")
 
     def init_schema(self) -> None:
         self._conn.executescript(_SCHEMA.read_text(encoding="utf-8"))
@@ -68,6 +71,24 @@ class Storage:
             ON CONFLICT(repository, day, path)
             DO UPDATE SET title=excluded.title, count=excluded.count,
                          uniques=excluded.uniques
+            """,
+            rows,
+        )
+        self._conn.commit()
+        return len(rows)
+
+    def upsert_repos(self, repos: Iterable[RepoMeta]) -> int:
+        rows = [
+            (r.repository, int(r.is_fork), r.visibility, int(r.is_archived), r.updated_at)
+            for r in repos
+        ]
+        self._conn.executemany(
+            """
+            INSERT INTO repos (repository, is_fork, visibility, is_archived, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(repository)
+            DO UPDATE SET is_fork=excluded.is_fork, visibility=excluded.visibility,
+                         is_archived=excluded.is_archived, updated_at=excluded.updated_at
             """,
             rows,
         )

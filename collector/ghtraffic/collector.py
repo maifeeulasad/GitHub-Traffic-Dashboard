@@ -7,7 +7,7 @@ import logging
 import time
 
 from .client import GitHubClient
-from .models import PopularPath, Referrer, TrafficPoint
+from .models import PopularPath, Referrer, RepoMeta, TrafficPoint
 from .storage import Storage
 
 log = logging.getLogger("ghtraffic.collector")
@@ -64,6 +64,22 @@ class Collector:
             for p in (self._client.paths(repository) or [])
         ]
         log.debug("%s: upserted %d popular paths", repository, self._storage.upsert_paths(paths))
+
+    def sync_repos(self) -> None:
+        """Load repo dimension metadata (fork/visibility/archived). Cheap; no traffic."""
+        raw = self._client.list_owned_repos()
+        metas = [
+            RepoMeta(
+                repository=r.get("full_name", ""),
+                is_fork=bool(r.get("fork", False)),
+                visibility="private" if r.get("private") else "public",
+                is_archived=bool(r.get("archived", False)),
+                updated_at=(r.get("pushed_at") or r.get("updated_at") or "")[:10],
+            )
+            for r in raw
+            if r.get("full_name")
+        ]
+        log.info("synced %d repo metadata rows", self._storage.upsert_repos(metas))
 
     def collect_all(self, repositories: list[str]) -> None:
         total = len(repositories)

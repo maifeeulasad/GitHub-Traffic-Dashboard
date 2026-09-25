@@ -102,3 +102,21 @@ class GitHubClient:
     def paths(self, repository: str) -> Any:
         """Top popular content paths (current snapshot)."""
         return self._get(f"repos/{repository}/traffic/popular/paths")
+
+    # --- repo metadata (cheap, not traffic; a handful of paginated calls) ---
+
+    def list_owned_repos(self, per_page: int = 100) -> list[dict]:
+        """All repos the user owns/collaborates on, with fork/visibility flags."""
+        out: list[dict] = []
+        page = 1
+        while True:
+            batch = self._get(
+                f"user/repos?per_page={per_page}&page={page}&affiliation=owner,collaborator,organization_member"
+            )
+            if not batch:
+                break
+            out.extend(batch)
+            if len(batch) < per_page:
+                break
+            page += 1
+        return out

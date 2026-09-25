@@ -34,6 +34,16 @@ CREATE TABLE IF NOT EXISTS popular_paths (
     PRIMARY KEY (repository, day, path)
 );
 
+-- Repository metadata (dimension table) for filtering: fork/source,
+-- public/private, archived. Populated from the repo list, NOT the traffic API.
+CREATE TABLE IF NOT EXISTS repos (
+    repository  TEXT    NOT NULL PRIMARY KEY,  -- "owner/repo"
+    is_fork     INTEGER NOT NULL DEFAULT 0,
+    visibility  TEXT    NOT NULL DEFAULT 'public',  -- 'public' | 'private'
+    is_archived INTEGER NOT NULL DEFAULT 0,
+    updated_at  TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_traffic_repo_day ON traffic_daily (repository, day);
 CREATE INDEX IF NOT EXISTS idx_referrers_repo_day ON referrers (repository, day);
 CREATE INDEX IF NOT EXISTS idx_paths_repo_day ON popular_paths (repository, day);
