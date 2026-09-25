@@ -64,5 +64,5 @@ provisioned dashboards). Two containers only, via `docker compose`.
 
 ### Polish
 - [x] Multi-repo config (list of repos to track)
-- [ ] Week-over-week deltas / top-growing repos panel
+- [x] Week-over-week deltas / top-growing repos panel
 - [x] Docs: quickstart in README

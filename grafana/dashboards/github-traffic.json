@@ -96,6 +96,16 @@
       "gridPos": { "h": 9, "w": 8, "x": 16, "y": 15 },
       "options": { "showHeader": true },
       "targets": [ { "refId": "A", "queryType": "table", "rawQueryText": "SELECT repository AS \"Repository\", SUM(CASE WHEN metric='views' THEN count ELSE 0 END) AS \"Views\", SUM(CASE WHEN metric='views' THEN uniques ELSE 0 END) AS \"Unique visitors\", SUM(CASE WHEN metric='clones' THEN count ELSE 0 END) AS \"Clones\" FROM traffic_daily WHERE repository IN (${repository:sqlstring}) GROUP BY repository ORDER BY \"Views\" DESC", "queryText": "SELECT repository AS \"Repository\", SUM(CASE WHEN metric='views' THEN count ELSE 0 END) AS \"Views\", SUM(CASE WHEN metric='views' THEN uniques ELSE 0 END) AS \"Unique visitors\", SUM(CASE WHEN metric='clones' THEN count ELSE 0 END) AS \"Clones\" FROM traffic_daily WHERE repository IN (${repository:sqlstring}) GROUP BY repository ORDER BY \"Views\" DESC", "timeColumns": [] } ]
+    },
+
+    { "type": "row", "title": "Momentum (week over week)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 } },
+    {
+      "type": "table", "title": "Top-growing repositories (views, last 7d vs prior 7d)",
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "ghtraffic-sqlite" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 25 },
+      "options": { "showHeader": true },
+      "fieldConfig": { "defaults": {}, "overrides": [ { "matcher": { "id": "byName", "options": "Change" }, "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-background" } }, { "id": "color", "value": { "mode": "continuous-RdYlGr" } } ] } ] },
+      "targets": [ { "refId": "A", "queryType": "table", "rawQueryText": "SELECT repository AS \"Repository\", SUM(CASE WHEN day >= date('now','-7 day') THEN count ELSE 0 END) AS \"Last 7d\", SUM(CASE WHEN day < date('now','-7 day') AND day >= date('now','-14 day') THEN count ELSE 0 END) AS \"Prior 7d\", SUM(CASE WHEN day >= date('now','-7 day') THEN count ELSE 0 END) - SUM(CASE WHEN day < date('now','-7 day') AND day >= date('now','-14 day') THEN count ELSE 0 END) AS \"Change\" FROM traffic_daily WHERE metric='views' AND repository IN (${repository:sqlstring}) GROUP BY repository ORDER BY \"Change\" DESC", "queryText": "SELECT repository AS \"Repository\", SUM(CASE WHEN day >= date('now','-7 day') THEN count ELSE 0 END) AS \"Last 7d\", SUM(CASE WHEN day < date('now','-7 day') AND day >= date('now','-14 day') THEN count ELSE 0 END) AS \"Prior 7d\", SUM(CASE WHEN day >= date('now','-7 day') THEN count ELSE 0 END) - SUM(CASE WHEN day < date('now','-7 day') AND day >= date('now','-14 day') THEN count ELSE 0 END) AS \"Change\" FROM traffic_daily WHERE metric='views' AND repository IN (${repository:sqlstring}) GROUP BY repository ORDER BY \"Change\" DESC", "timeColumns": [] } ]
     }
   ]
 }
