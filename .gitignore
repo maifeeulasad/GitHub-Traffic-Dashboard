@@ -1,0 +1,14 @@
+# secrets / local config
+.env
+
+# data volumes (SQLite db + grafana state)
+data/
+grafana-storage/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
