@@ -11,6 +11,22 @@ selected repo, rank traffic sources, and slice by interesting filters.
 
 See [`CLAUDE.md`](CLAUDE.md) for the full design/instruction set.
 
+## Quickstart
+
+```bash
+cp .env.example .env                 # set REPOS=owner/repo,owner/repo
+export GH_TOKEN="$(gh auth token)"   # CLI-now auth; needs push access to the repos
+export REPOS="owner/repo"            # or edit .env
+docker compose up -d --build
+```
+
+- Grafana: <http://localhost:3000> (admin / admin) → dashboard **GitHub Traffic Insights**.
+- The collector runs one pass immediately, then once every 24h.
+- Backfill the full 14-day window once: `docker compose exec collector python -m ghtraffic.cli --backfill`
+
+> Rootless Docker note: if `docker` can't find the daemon, use
+> `export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock`.
+
 ## Stack
 
 `gh` CLI (auth today, PAT/App provisioned for later) → Python OOP collector →
@@ -41,12 +57,12 @@ provisioned dashboards). Two containers only, via `docker compose`.
 - [x] Daily scheduler (last 1–2 days pull) + backfill mode
 
 ### Infra
-- [ ] `docker compose`: grafana + collector (shared `data/` volume)
-- [ ] Grafana provisioning: `frser-sqlite-datasource` as code
-- [ ] Grafana dashboard JSON: overview + per-repo + sources + filters
-- [ ] Template variables: `$repository`, date range, metric, source
+- [x] `docker compose`: grafana + collector (shared `data/` volume)
+- [x] Grafana provisioning: `frser-sqlite-datasource` as code
+- [x] Grafana dashboard JSON: overview + per-repo + sources + filters
+- [x] Template variables: `$repository`, date range, metric, source
 
 ### Polish
 - [x] Multi-repo config (list of repos to track)
 - [ ] Week-over-week deltas / top-growing repos panel
-- [ ] Docs: quickstart in README
+- [x] Docs: quickstart in README
