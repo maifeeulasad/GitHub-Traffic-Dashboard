@@ -11,6 +11,7 @@ class Config:
     repositories: list[str] = field(default_factory=list)
     db_path: str = "/data/traffic.db"
     collect_days: int = 2
+    repo_delay: float = 0.0
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -20,4 +21,5 @@ class Config:
             repositories=repositories,
             db_path=os.environ.get("DB_PATH", "/data/traffic.db"),
             collect_days=int(os.environ.get("COLLECT_DAYS", "2")),
+            repo_delay=float(os.environ.get("REPO_DELAY", "0")),
         )

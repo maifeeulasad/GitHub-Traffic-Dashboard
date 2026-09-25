@@ -25,7 +25,9 @@ def _run_once(cfg: Config, collect_days: int) -> None:
     with Storage(cfg.db_path) as storage:
         storage.init_schema()
         client = GitHubClient(default_provider())
-        Collector(client, storage, collect_days=collect_days).collect_all(cfg.repositories)
+        Collector(
+            client, storage, collect_days=collect_days, repo_delay=cfg.repo_delay
+        ).collect_all(cfg.repositories)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -1,4 +1,7 @@
-# Two containers, one shared SQLite file. No DB server.
+# Two containers, one shared SQLite file on a named volume. No DB server.
+#
+# Both run as uid 472 (non-root) so, under rootless Docker, they share the
+# volume at the same uid and the SQLite WAL file works without root.
 #
 # Auth: export a token before `up` so the collector can reach the API:
 #   export GH_TOKEN="$(gh auth token)"    # host has gh logged in
@@ -12,26 +15,24 @@ services:
       COLLECT_DAYS: ${COLLECT_DAYS:-2}
       DB_PATH: /data/traffic.db
     volumes:
-      - ./data:/data
+      - dbdata:/data
     restart: unless-stopped
     # daemon: one pass now, then every 24h (see Dockerfile CMD)
 
   grafana:
     image: grafana/grafana:11.2.0
-    # Run as root so, under rootless Docker, Grafana shares the collector's
-    # host UID and can open the WAL SQLite file (create -wal/-shm sidecars).
-    user: "0"
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Anonymous access with no login form — password disabled for local use.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_BASIC_ENABLED: "false"
       GF_INSTALL_PLUGINS: frser-sqlite-datasource
       GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: frser-sqlite-datasource
     ports:
       - "3000:3000"
     volumes:
-      # read-write: the SQLite (WAL) plugin needs to touch -wal/-shm sidecars.
-      # Grafana only ever issues SELECTs, so the data stays collector-owned.
-      - ./data:/data
+      - dbdata:/data
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-storage:/var/lib/grafana
@@ -40,4 +41,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  dbdata:
   grafana-storage:

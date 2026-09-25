@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import time
 
 from .client import GitHubClient
 from .models import PopularPath, Referrer, TrafficPoint
@@ -20,10 +21,12 @@ class Collector:
         client: GitHubClient,
         storage: Storage,
         collect_days: int = 2,
+        repo_delay: float = 0.0,
     ) -> None:
         self._client = client
         self._storage = storage
         self._collect_days = collect_days
+        self._repo_delay = repo_delay
 
     def collect(self, repository: str) -> None:
         today = dt.date.today().isoformat()
@@ -34,7 +37,7 @@ class Collector:
         points += self._map_series(repository, "views", self._client.views(repository), cutoff)
         points += self._map_series(repository, "clones", self._client.clones(repository), cutoff)
         n = self._storage.upsert_traffic(points)
-        log.info("%s: upserted %d traffic points (>= %s)", repository, n, cutoff)
+        log.debug("%s: upserted %d traffic points (>= %s)", repository, n, cutoff)
 
         # --- snapshots: referrers + popular paths, stamped with collection day ---
         refs = [
@@ -47,7 +50,7 @@ class Collector:
             )
             for r in (self._client.referrers(repository) or [])
         ]
-        log.info("%s: upserted %d referrers", repository, self._storage.upsert_referrers(refs))
+        log.debug("%s: upserted %d referrers", repository, self._storage.upsert_referrers(refs))
 
         paths = [
             PopularPath(
@@ -60,14 +63,25 @@ class Collector:
             )
             for p in (self._client.paths(repository) or [])
         ]
-        log.info("%s: upserted %d popular paths", repository, self._storage.upsert_paths(paths))
+        log.debug("%s: upserted %d popular paths", repository, self._storage.upsert_paths(paths))
 
     def collect_all(self, repositories: list[str]) -> None:
-        for repo in repositories:
+        total = len(repositories)
+        ok = skipped = 0
+        for i, repo in enumerate(repositories, 1):
             try:
                 self.collect(repo)
-            except Exception:  # noqa: BLE001 - one repo failing must not sink the rest
-                log.exception("failed to collect %s", repo)
+                ok += 1
+            except Exception as exc:  # noqa: BLE001 - one repo must not sink the rest
+                skipped += 1
+                # 403 usually means no push access (traffic API needs it) — expected
+                # across a large repo set, so keep it quiet unless it's something else.
+                log.warning("[%d/%d] skipped %s: %s", i, total, repo, exc)
+            if i % 50 == 0 or i == total:
+                log.info("progress: %d/%d repos (%d ok, %d skipped)", i, total, ok, skipped)
+            if self._repo_delay and i < total:
+                time.sleep(self._repo_delay)
+        log.info("collection done: %d ok, %d skipped, of %d repos", ok, skipped, total)
 
     @staticmethod
     def _map_series(
