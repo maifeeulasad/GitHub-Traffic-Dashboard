@@ -1,0 +1,97 @@
+apiVersion: 1
+
+# Week-over-week traffic alerts, one instance per repository. Uses the default
+# notification policy/contact point — wire up SMTP or a webhook in Grafana to
+# actually deliver, but rules still evaluate and show state in Alerting.
+#
+# A = per-repo WoW change as a single labelled time-series point (frser splits
+#     series by the `repository` column into a label)
+# B = reduce(last) -> one number per repository
+# C = threshold -> fires per repository
+groups:
+  - orgId: 1
+    name: Traffic momentum
+    folder: GitHub Traffic
+    interval: 1m
+    rules:
+      - uid: repo-view-growth
+        title: Repository view growth (WoW)
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          direction: growth
+        annotations:
+          summary: "{{ $labels.repository }} views grew week-over-week (value {{ $values.B }})"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 86400, to: 0 }
+            datasourceUid: ghtraffic-sqlite
+            model:
+              refId: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              queryType: time series
+              timeColumns: [time]
+              rawQueryText: &change_sql >-
+                SELECT strftime('%s','now') AS time, repository,
+                  SUM(CASE WHEN day >= date('now','-7 day') THEN count ELSE 0 END)
+                  - SUM(CASE WHEN day < date('now','-7 day') AND day >= date('now','-14 day') THEN count ELSE 0 END)
+                  AS change
+                FROM traffic_daily WHERE metric='views'
+                GROUP BY repository HAVING change <> 0
+              queryText: *change_sql
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [30] }
+
+      - uid: repo-view-drop
+        title: Repository view drop (WoW)
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          direction: drop
+        annotations:
+          summary: "{{ $labels.repository }} views fell week-over-week (value {{ $values.B }})"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 86400, to: 0 }
+            datasourceUid: ghtraffic-sqlite
+            model:
+              refId: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              queryType: time series
+              timeColumns: [time]
+              rawQueryText: *change_sql
+              queryText: *change_sql
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [-20] }
