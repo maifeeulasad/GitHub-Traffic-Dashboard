@@ -94,24 +94,28 @@ Traffic endpoints require **push access** to the repo (owner token satisfies thi
 
 ```
 ┌──────────────┐   daily    ┌──────────────┐   SQL upsert   ┌──────────────┐
-│  collector   │──────────► │  GitHubClient │──────────────►│  PostgreSQL   │
-│ (scheduler)  │            │ + AuthProvider│               │ (time series) │
+│  collector   │──────────► │  GitHubClient │──────────────►│   SQLite      │
+│ (scheduler)  │            │ + AuthProvider│               │ data/traffic.db│
 └──────────────┘            └──────────────┘               └──────┬───────┘
-                                                                   │ query
+                                                                   │ query (plugin)
                                                             ┌──────▼───────┐
                                                             │   Grafana     │
                                                             │  dashboards   │
                                                             └──────────────┘
 ```
 
-- **Storage = PostgreSQL** (Grafana's Postgres datasource), not Prometheus: our data is
-  daily historical counts that need backfill + idempotent upserts, which suits SQL far
-  better than a scrape-based TSDB. Schema keyed by `(repository, day, metric)`.
+- **Storage = SQLite** (a single file, read in Grafana via the
+  `frser-sqlite-datasource` plugin), not Postgres/Prometheus: our data is small, daily,
+  historical counts that need backfill + idempotent upserts. SQLite gives us SQL and
+  zero DB-server overhead — no extra container, just a mounted `data/traffic.db`. Schema
+  keyed by `(repository, day, metric)`. If volume ever outgrows it, the DAO layer is the
+  only thing that changes (swap to Postgres).
 - **Collector** is a small Python (OOP) service: `AuthProvider` → `GitHubClient` →
   domain models (`TrafficPoint`, `Referrer`, `PopularPath`) → `Repository`/DAO layer →
-  Postgres. Scheduling starts as a simple cron/loop; keep it swappable.
-- **Grafana** is provisioned as code (datasource + dashboard JSON under
+  SQLite. Scheduling starts as a simple cron/loop; keep it swappable.
+- **Grafana** is provisioned as code (SQLite datasource + dashboard JSON under
   `grafana/provisioning/`), so the whole stack is reproducible from `docker compose up`.
+  Only two containers: `grafana` and `collector`, sharing the `data/` volume.
 
 ## Docker / local dev
 

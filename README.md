@@ -14,8 +14,8 @@ See [`CLAUDE.md`](CLAUDE.md) for the full design/instruction set.
 ## Stack
 
 `gh` CLI (auth today, PAT/App provisioned for later) → Python OOP collector →
-PostgreSQL (idempotent daily upserts) → Grafana (provisioned dashboards).
-Everything runs via `docker compose`.
+SQLite (single file, idempotent daily upserts) → Grafana (`frser-sqlite-datasource`,
+provisioned dashboards). Two containers only, via `docker compose`.
 
 ## Roadmap / Task tracking
 
@@ -25,11 +25,11 @@ Everything runs via `docker compose`.
 - [ ] `.gitignore` (`.env`, data volumes, Python caches)
 - [ ] `.env.example` documenting `GH_TOKEN`, `REPOS`, DB creds
 
-### Data model
-- [ ] Postgres schema: `traffic_daily(repo, day, metric, count, uniques)` upsert key
+### Data model (SQLite)
+- [ ] `traffic_daily(repo, day, metric, count, uniques)` upsert key
 - [ ] `referrers(repo, day, source, count, uniques)` upsert key
 - [ ] `popular_paths(repo, day, path, count, uniques)` upsert key
-- [ ] Migration/bootstrap SQL
+- [ ] Bootstrap `schema.sql`
 
 ### Collector (Python, OOP)
 - [ ] `AuthProvider` interface + `CliAuthProvider` (`gh auth token`)
@@ -41,8 +41,8 @@ Everything runs via `docker compose`.
 - [ ] Daily scheduler (last 1–2 days pull) + backfill mode
 
 ### Infra
-- [ ] `docker compose`: postgres + grafana + collector
-- [ ] Grafana provisioning: Postgres datasource as code
+- [ ] `docker compose`: grafana + collector (shared `data/` volume)
+- [ ] Grafana provisioning: `frser-sqlite-datasource` as code
 - [ ] Grafana dashboard JSON: overview + per-repo + sources + filters
 - [ ] Template variables: `$repository`, date range, metric, source
 
