@@ -26,12 +26,18 @@ tool**. Design panels and the data model so the owner can answer:
 - **Traffic sources** — which referring sites (reddit, HN, google, npm, personal blog,
   etc.) drive unique visitors; treat referrers as *lead channels* and rank/trend them.
 - **Popular content** — which paths pull attention (candidate landing surfaces).
-- **Interesting filters** — dashboard variables/filters for: repo(s), date range,
-  metric (views vs clones vs uniques), referrer/source, and "unique vs total". Keep the
+- **Interesting filters** — dashboard variables for: repo(s), date range, and
+  repo attributes (**visibility** public/private, **type** source/fork, **archived**).
+  These chain into the `$repository` picker via the `repos` dimension table. Keep the
   schema tall/normalized so new filters are just `WHERE` clauses, not new tables.
+- **Detailed per-repo view** — a collapsed, opt-in graph with one line per repo. It is
+  a pure local-SQLite query, so it has **no API cost** and can show everything at once;
+  the aggregated Trends panels stay the default, this is the drill-down.
+- **Alerts** — per-repo week-over-week **growth** and **drop** rules (provisioned).
 
-Persist enough dimension detail (repo, day, metric, source/path, unique-vs-total) that
-any of the above is a query, never a re-fetch.
+Persist enough dimension detail (repo, day, metric, source/path, unique-vs-total, and
+repo attributes) that any of the above is a query, never a re-fetch. Never re-download
+traffic just to add a filter — repo attributes come from the cheap repo-list API.
 
 ## Non-negotiable project rules (from the owner)
 
@@ -111,8 +117,15 @@ Traffic endpoints require **push access** to the repo (owner token satisfies thi
   keyed by `(repository, day, metric)`. If volume ever outgrows it, the DAO layer is the
   only thing that changes (swap to Postgres).
 - **Collector** is a small Python (OOP) service: `AuthProvider` → `GitHubClient` →
-  domain models (`TrafficPoint`, `Referrer`, `PopularPath`) → `Repository`/DAO layer →
-  SQLite. Scheduling starts as a simple cron/loop; keep it swappable.
+  domain models (`TrafficPoint`, `Referrer`, `PopularPath`, `RepoMeta`) → `Storage`/DAO
+  layer → SQLite. Scheduling starts as a simple loop; keep it swappable. The client
+  retries on rate-limit (403/429) and transient DNS/network errors; `Storage` sets
+  `busy_timeout` so a one-off `--sync-repos` can run alongside the collector.
+- **Repo metadata** (`repos` table: is_fork, visibility, is_archived) is synced from the
+  repo-list API (`GET /user/repos`) — a handful of cheap calls, never the traffic
+  endpoints. It powers the visibility/type/archived filters.
+- **Alerts** live in `grafana/provisioning/alerting/` as code: per-repo WoW change via
+  `time series → reduce → threshold` (frser labels series by `repository`).
 - **Grafana** is provisioned as code (SQLite datasource + dashboard JSON under
   `grafana/provisioning/`), so the whole stack is reproducible from `docker compose up`.
   Only two containers: `grafana` and `collector`, sharing the `data/` volume.
