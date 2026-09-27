@@ -57,6 +57,11 @@ SQLite (single file, idempotent daily upserts) → Grafana (`frser-sqlite-dataso
 provisioned dashboards + alerts). Two containers only, via `docker compose`.
 Client retries on rate-limit (403/429) and transient DNS/network errors.
 
+## Snap
+
+Want to take a quick peek without installing or running, please check:
+![GitHub-Traffic-Dashboard snap maifeeulasad](https://github.com/maifeeulasad/GitHub-Traffic-Dashboard/blob/snap/Screenshot%20from%202026-09-26%2004-03-40.png?raw=true)
+
 ## Roadmap / Task tracking
 
 ### Foundations
